@@ -25,7 +25,37 @@
   }
   * { box-sizing: border-box; }
   body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45; }
-  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  /* Tres columnas en pantallas anchas: resumen · contenido · atajos. En angostas, una sola. */
+  .layout { display: grid; grid-template-columns: minmax(0, 980px); grid-template-areas: "main" "left" "right";
+    justify-content: center; gap: 0 28px; padding: 32px 20px 64px; }
+  main { grid-area: main; min-width: 0; }
+  .side { display: flex; flex-direction: column; gap: 14px; margin-top: 28px; }
+  .side.left { grid-area: left; }
+  .side.right { grid-area: right; }
+  @media (min-width: 1280px) {
+    .layout { grid-template-columns: 260px minmax(0, 900px) 260px; grid-template-areas: "left main right"; }
+    .side { margin-top: 0; position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow: auto; }
+  }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; font-size: 14px; }
+  .panel h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat { background: var(--bg); border-radius: 8px; padding: 10px; }
+  .stat b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  .stat.wide { grid-column: 1 / -1; }
+  .stat.good b { color: var(--good); }
+  .opp { margin-top: 10px; font-size: 13px; }
+  .opp a { color: inherit; }
+  .recent { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+  .recent button { width: 100%; text-align: left; border: 0; background: var(--bg); padding: 7px 10px; font-size: 13px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .recent button:hover { background: var(--line); }
+  .linkbtn { border: 0; background: none; padding: 0; color: var(--muted); font-size: 12px; text-decoration: underline; margin-top: 8px; }
+  .stores { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+  .stores li { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+  .tips { margin: 0; padding-left: 18px; color: var(--muted); font-size: 13px; display: flex; flex-direction: column; gap: 6px; }
+  .side .bm { margin: 0; }
+  .side .bm summary { margin-bottom: 4px; }
   h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.02em; }
   h1.brand { display: flex; align-items: center; gap: 12px; }
   h1.brand img { width: 40px; height: 40px; flex: none; }
@@ -129,6 +159,24 @@
 </style>
 </head>
 <body>
+<div class="layout">
+<aside class="side left" aria-label="Tu resumen">
+  <section class="panel">
+    <h3>Tu resumen</h3>
+    <div class="stats">
+      <div class="stat"><b id="stCount">0</b><span>productos seguidos</span></div>
+      <div class="stat"><b id="stTarget">0</b><span>en tu precio objetivo</span></div>
+      <div class="stat wide good"><b id="stSaving">$0</b><span>ahorro si compras donde está más barato</span></div>
+    </div>
+    <div class="opp" id="stOpp"></div>
+  </section>
+  <section class="panel">
+    <h3>Búsquedas recientes</h3>
+    <ul class="recent" id="recent"></ul>
+    <button type="button" class="linkbtn" id="recentClear" hidden>Borrar historial</button>
+  </section>
+</aside>
+
 <main>
   <h1 class="brand"><img src="/logo.svg" alt="" width="40" height="40">Price Seeker</h1>
   <p class="sub">Busca un producto para comparar precios, o sigue el precio de un link y te aviso cuando baje.</p>
@@ -158,21 +206,36 @@
   </form>
   <div class="msg" id="msg" role="status"></div>
   <section class="ml" id="ml" hidden></section>
-  <details class="bm" id="bm">
-    <summary><strong>Temu y Shein:</strong> usa el botón <em>Enviar a Price Seeker</em></summary>
-    <p>Temu y Shein bloquean la lectura automática, así que no los abro yo: los lees tú en tu navegador y me los envías.</p>
-    <ol>
-      <li>Muestra la barra de marcadores (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) y <strong>arrastra este botón</strong> hasta ella:
-        <a class="bmlink" id="bmlink" href="#" title="Arrástrame a la barra de marcadores">⇪ Enviar a Price Seeker</a></li>
-      <li>Abre un producto en Temu o Shein (o en cualquier tienda) y haz clic en el marcador.</li>
-      <li>Se abre una pestaña con el nombre y el precio leídos: revísalos y pulsa <strong>Guardar y comparar</strong>.</li>
-    </ol>
-    <p class="muted">Busco el mismo producto más barato en Amazon y AliExpress, y lo vuelvo a buscar cada 6 horas.
-      El precio de Temu o Shein se actualiza cuando vuelves a pulsar el marcador en ese producto.</p>
-  </details>
 
   <section id="list"></section>
 </main>
+
+<aside class="side right" aria-label="Atajos">
+  <section class="panel">
+    <h3>Tiendas</h3>
+    <ul class="stores" id="stores"></ul>
+  </section>
+  <details class="bm panel" id="bm" open>
+    <summary><strong>Botón para Temu y Shein</strong></summary>
+    <p>Temu y Shein bloquean la lectura automática: los lees tú en tu navegador y me los envías.</p>
+    <ol>
+      <li>Muestra la barra de marcadores (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) y <strong>arrastra este botón</strong> hasta ella:<br>
+        <a class="bmlink" id="bmlink" href="#" title="Arrástrame a la barra de marcadores">⇪ Enviar a Price Seeker</a></li>
+      <li>En la página del producto, haz clic en el marcador y arrastra sobre la foto.</li>
+      <li>Revisa nombre y precio, y pulsa <strong>Guardar y comparar</strong> o <strong>Buscar sin seguir</strong>.</li>
+    </ol>
+  </details>
+  <section class="panel">
+    <h3>Consejos</h3>
+    <ul class="tips">
+      <li>Busca con el modelo exacto y la capacidad ("rtx 5060 8gb") para ver solo ese producto.</li>
+      <li>Si no sabes el modelo, describe el producto: verás lo más parecido.</li>
+      <li>Pon un precio objetivo y te aviso por correo cuando llegue.</li>
+      <li>Desconfía de precios muy bajos con pocas reseñas.</li>
+    </ul>
+  </section>
+</aside>
+</div>
 
 <script>
 const $ = (s, el = document) => el.querySelector(s);
@@ -222,6 +285,7 @@ async function load() {
   try {
     products = await api('/api/products');
     render();
+    renderSummary();
   } catch (e) {
     setMsg(e.message, true);
   }
@@ -578,6 +642,8 @@ async function loadMl() {
   const box = $('#ml');
   let s;
   try { s = await api('/api/ml/status'); } catch { return; }
+  mlState = s;
+  renderStores();
   box.hidden = false;
   if (!s.configured) {
     // Sin credenciales en .env no se muestra nada: el panel aparece cuando se configure la API.
@@ -625,6 +691,65 @@ $('#ml').addEventListener('click', async (e) => {
   if (q.get('ml_error')) setMsg(q.get('ml_error'), true);
   if (q.has('ml') || q.has('ml_error')) history.replaceState(null, '', '/');
 }
+
+// ---------- Paneles laterales ----------
+let mlState = null;
+
+// Resumen: cuántos sigues, cuántos llegaron al objetivo y cuánto ahorrarías comprando donde está más barato.
+function renderSummary() {
+  const withSaving = products
+    .filter((p) => p.last_metric != null && p.source_price != null && p.last_metric_store && p.last_metric_store !== p.store)
+    .map((p) => ({ p, saving: p.source_price - p.last_metric }))
+    .filter((x) => x.saving > 0);
+  $('#stCount').textContent = products.length;
+  $('#stTarget').textContent = products.filter((p) => p.target_price && p.last_metric != null && p.last_metric <= p.target_price).length;
+  $('#stSaving').textContent = cop(withSaving.reduce((s, x) => s + x.saving, 0));
+  const top = withSaving.sort((a, b) => b.saving - a.saving)[0];
+  $('#stOpp').innerHTML = top
+    ? `Mejor oportunidad: <strong>${esc((top.p.title || '').slice(0, 60))}</strong> en ${esc(top.p.best_store_name || '')}, ${cop(top.saving)} menos.`
+    : products.length ? '<span style="color:var(--muted)">Aún no encontré tus productos más baratos en otra tienda.</span>'
+      : '<span style="color:var(--muted)">Busca un producto o pega un link para empezar.</span>';
+}
+
+// Tiendas: cuáles busco solo y cuáles necesitan el botón.
+function renderStores() {
+  const ml = mlState?.connected ? ['Automático (API)', 'good'] : ['Pausado: sin API', 'warn'];
+  const rows = [
+    ['Amazon', 'Automático', 'good'],
+    ['AliExpress', 'Automático', 'good'],
+    ['Mercado Libre', ...ml],
+    ['Temu', 'Con el botón', 'src'],
+    ['Shein', 'Con el botón', 'src'],
+  ];
+  $('#stores').innerHTML = rows.map(([n, s, c]) => `<li><span>${n}</span><span class="pill ${c}">${s}</span></li>`).join('');
+}
+
+// Búsquedas recientes: solo en este navegador.
+const RECENT_KEY = 'ps-recent';
+const getRecent = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY)) || []; } catch { return []; } };
+function addRecent(q) {
+  const list = [q, ...getRecent().filter((x) => x.toLowerCase() !== q.toLowerCase())].slice(0, 8);
+  localStorage.setItem(RECENT_KEY, JSON.stringify(list));
+  renderRecent();
+}
+function renderRecent() {
+  const list = getRecent();
+  $('#recent').innerHTML = list.length
+    ? list.map((q) => `<li><button type="button" data-q="${esc(q)}" title="Buscar de nuevo">🔍 ${esc(q)}</button></li>`).join('')
+    : '<li style="color:var(--muted);font-size:13px">Tus búsquedas aparecerán aquí.</li>';
+  $('#recentClear').hidden = !list.length;
+}
+$('#recent').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-q]');
+  if (!btn) return;
+  $('#search').q.value = btn.dataset.q;
+  searchImage = null;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+  runSearch(btn.dataset.q);
+});
+$('#recentClear').addEventListener('click', () => { localStorage.removeItem(RECENT_KEY); renderRecent(); });
+renderRecent();
+renderStores();
 
 // ---------- Barra de búsqueda ----------
 const STORE_NAMES = { amazon: 'Amazon', aliexpress: 'AliExpress', mercadolibre: 'Mercado Libre', temu: 'Temu', shein: 'Shein' };
@@ -686,6 +811,7 @@ async function runSearch(q) {
   const form = $('#search');
   const btn = form.querySelector('button');
   btn.disabled = true;
+  addRecent(q);
   setSearchMsg('<span class="spinner"></span> Buscando en las tiendas… puede tardar 30 a 60 segundos.');
   try {
     const data = await api('/api/search', { method: 'POST', body: JSON.stringify({ q, image: searchImage }) });
