@@ -97,9 +97,30 @@
   .bmlink { display: inline-block; margin-left: 6px; background: var(--accent); color: #fff; padding: 4px 10px;
     border-radius: 6px; text-decoration: none; font-weight: 600; cursor: grab; }
   kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+  form.search { display: grid; grid-template-columns: 1fr auto; gap: 8px; background: var(--card);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+  form.search input { font-size: 16px; padding: 12px 14px; }
+  h2.section { font-size: 16px; margin: 28px 0 10px; }
+  .results h2 { font-size: 18px; margin: 18px 0 2px; }
+  .results .count { color: var(--muted); font-weight: 400; font-size: 14px; }
+  .results .hint { color: var(--muted); font-size: 13px; margin: 0 0 10px; }
+  .results #refImg img { width: 72px; height: 72px; object-fit: contain; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .rcard { background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+    display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+  .rcard.top { border-color: var(--good); box-shadow: 0 0 0 1px var(--good) inset; }
+  .rcard img { width: 100%; height: 140px; object-fit: contain; background: #fff; border-radius: 6px; }
+  .rcard .t { color: inherit; text-decoration: none; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+  .rcard .t:hover { text-decoration: underline; }
+  .rcard .p { font-size: 18px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .rcard .m { color: var(--muted); font-size: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+  .rcard .pills { display: flex; gap: 4px; flex-wrap: wrap; }
+  .rcard button { margin-top: auto; }
+  .empty-r { color: var(--muted); font-size: 14px; padding: 8px 0; }
   @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
   @media (max-width: 760px) {
     form.add { grid-template-columns: 1fr; }
+    .grid { grid-template-columns: repeat(2, 1fr); }
     .head { grid-template-columns: 56px 1fr; }
     .head img { width: 56px; height: 56px; }
     .actions { grid-column: 1 / -1; justify-content: flex-start; }
@@ -110,8 +131,25 @@
 <body>
 <main>
   <h1 class="brand"><img src="/logo.svg" alt="" width="40" height="40">Price Seeker</h1>
-  <p class="sub">Pega un link de Amazon, Mercado Libre o AliExpress (o envía uno de Temu o Shein con el botón). Busco el mismo producto más barato en las otras tiendas y, si no lo hay, te aviso cuando el tuyo baje.</p>
+  <p class="sub">Busca un producto para comparar precios, o sigue el precio de un link y te aviso cuando baje.</p>
 
+  <form class="search" id="search" role="search">
+    <input name="q" type="search" maxlength="120" autocomplete="off" required
+      placeholder="Busca: rtx 5060 8gb · audífonos inalámbricos con cancelación de ruido…" aria-label="Buscar un producto">
+    <button class="primary" type="submit">Buscar</button>
+  </form>
+  <div class="msg" id="searchMsg" role="status"></div>
+  <section class="results" id="results" hidden>
+    <div id="refImg"></div>
+    <h2>Exactos <span class="count" id="exactCount"></span></h2>
+    <p class="hint" id="exactHint"></p>
+    <div class="grid" id="exact"></div>
+    <h2>Similares <span class="count" id="similarCount"></span></h2>
+    <p class="hint">Otras variantes y modelos parecidos, por si te sirven.</p>
+    <div class="grid" id="similar"></div>
+  </section>
+
+  <h2 class="section">Seguir el precio de un link</h2>
   <form class="add" id="add">
     <input name="url" type="url" placeholder="https://www.mercadolibre.com.co/..." required aria-label="Link del producto">
     <input name="targetPrice" inputmode="numeric" placeholder="Precio objetivo (COP)" aria-label="Precio objetivo en COP, opcional">
@@ -586,6 +624,116 @@ $('#ml').addEventListener('click', async (e) => {
   if (q.get('ml') === 'ok') setMsg('Mercado Libre conectado. Las próximas revisiones lo usarán.');
   if (q.get('ml_error')) setMsg(q.get('ml_error'), true);
   if (q.has('ml') || q.has('ml_error')) history.replaceState(null, '', '/');
+}
+
+// ---------- Barra de búsqueda ----------
+const STORE_NAMES = { amazon: 'Amazon', aliexpress: 'AliExpress', mercadolibre: 'Mercado Libre', temu: 'Temu', shein: 'Shein' };
+let searchImage = null; // foto de referencia (viene de la página de importar)
+
+function setSearchMsg(html, isError = false) {
+  const el = $('#searchMsg');
+  el.innerHTML = html;
+  el.className = 'msg' + (isError ? ' error' : '');
+}
+
+function resultCard(r, { top = false } = {}) {
+  const pills = [];
+  if (r.reason) pills.push(`<span class="pill bad">${esc(r.reason)}</span>`);
+  if (r.imageMatch) pills.push('<span class="pill good">misma foto</span>');
+  if (top) pills.push('<span class="pill good">mejor precio con buenas reseñas</span>');
+  if (!r.reason && r.qualified === false) pills.push('<span class="pill warn">pocas reseñas</span>');
+  const meta = [
+    esc(STORE_NAMES[r.store] || r.store),
+    r.rating != null ? '★ ' + Number(r.rating).toFixed(1) : null,
+    r.reviews != null ? Number(r.reviews).toLocaleString('es-CO') + ' reseñas' : null,
+  ].filter(Boolean).map((x) => `<span>${x}</span>`).join('');
+  return `<div class="rcard ${top ? 'top' : ''}">
+    ${safeImg(r.image) ? `<img src="${esc(safeImg(r.image))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : ''}
+    <a class="t" href="${esc(safeUrl(r.url))}" target="_blank" rel="noopener noreferrer">${esc(r.title)}</a>
+    <div class="p">${cop(r.priceCop)}</div>
+    <div class="m">${meta}</div>
+    ${pills.length ? `<div class="pills">${pills.join('')}</div>` : ''}
+    <button type="button" data-follow="${esc(safeUrl(r.url))}">Seguir precio</button>
+  </div>`;
+}
+
+function renderSearch(data) {
+  $('#results').hidden = false;
+  $('#refImg').innerHTML = searchImage && safeImg(searchImage.split('#')[0])
+    ? `<p class="hint">Comparando también con tu foto:</p><img src="${esc(safeImg(searchImage.split('#')[0]))}" alt="Tu foto de referencia" referrerpolicy="no-referrer">`
+    : '';
+  $('#exactCount').textContent = `(${data.exact.length})`;
+  $('#similarCount').textContent = `(${data.similar.length})`;
+  $('#exactHint').textContent = data.mode === 'modelo'
+    ? 'El mismo modelo y variante que buscaste, del más barato al más caro.'
+    : 'Los que mejor coinciden con tu descripción, del más barato al más caro.';
+  // Se destaca el más barato con buen rating y suficientes reseñas, no el más barato a secas
+  // (una publicación muy barata con 3 reseñas suele ser riesgosa).
+  const best = data.exact.find((r) => r.qualified);
+  $('#exact').innerHTML = data.exact.length
+    ? data.exact.map((r) => resultCard(r, { top: r === best && data.exact.length > 1 })).join('')
+    : '<p class="empty-r">No encontré ese producto exacto. Revisa los similares o prueba escribiéndolo de otra forma.</p>';
+  $('#similar').innerHTML = data.similar.length
+    ? data.similar.slice(0, 24).map((r) => resultCard(r)).join('')
+    : '<p class="empty-r">Sin resultados similares.</p>';
+  const errs = Object.entries(data.errors || {});
+  const stores = (data.searched || []).map((s) => STORE_NAMES[s] || s).join(', ');
+  setSearchMsg(`Busqué en ${esc(stores)}${data.cached ? ' (resultado de hace unos minutos)' : ''}.`
+    + (errs.length ? ` No respondió: ${errs.map(([k, v]) => `${esc(STORE_NAMES[k] || k)} (${esc(v)})`).join(' · ')}` : ''));
+}
+
+async function runSearch(q) {
+  const form = $('#search');
+  const btn = form.querySelector('button');
+  btn.disabled = true;
+  setSearchMsg('<span class="spinner"></span> Buscando en las tiendas… puede tardar 30 a 60 segundos.');
+  try {
+    const data = await api('/api/search', { method: 'POST', body: JSON.stringify({ q, image: searchImage }) });
+    renderSearch(data);
+  } catch (err) {
+    setSearchMsg(esc(err.message), true);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+$('#search').addEventListener('submit', (e) => {
+  e.preventDefault();
+  searchImage = null;
+  runSearch(e.target.q.value.trim());
+});
+
+// "Seguir precio" en un resultado: lo agrega a tus productos.
+$('#results').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-follow]');
+  if (!btn) return;
+  btn.disabled = true;
+  btn.textContent = 'Agregando…';
+  try {
+    await api('/api/products', { method: 'POST', body: JSON.stringify({ url: btn.dataset.follow }) });
+    btn.textContent = 'Siguiendo ✓';
+    load();
+  } catch (err) {
+    btn.textContent = 'Seguir precio';
+    btn.disabled = false;
+    setSearchMsg(esc(err.message), true);
+  }
+});
+
+// Búsqueda que llega desde la página de importar (título + foto del botón).
+{
+  const pending = sessionStorage.getItem('ps-search');
+  if (pending) {
+    sessionStorage.removeItem('ps-search');
+    try {
+      const { q, image } = JSON.parse(pending);
+      if (q) {
+        $('#search').q.value = q;
+        searchImage = image || null;
+        runSearch(q);
+      }
+    } catch {}
+  }
 }
 
 loadMl();

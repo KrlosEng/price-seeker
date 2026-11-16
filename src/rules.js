@@ -36,6 +36,23 @@ const codeEq = (a, b) => {
   return long.length - short.length === 1 && long.startsWith(short) && /[a-z]$/.test(long) && /\d$/.test(short);
 };
 
+// Palabras que marcan una variante de un modelo. Solo cuentan pegadas al modelo
+// ("5060 ti", "iphone 15 pro max", "s23 ultra", "5060ti"), no sueltas ("auriculares pro gaming").
+const VARIANT_WORDS = new Set(['ti', 'super', 'pro', 'max', 'plus', 'ultra', 'mini', 'lite', 'xl', 'xs', 'slim']);
+const VARIANT_SUFFIX = /^([a-z]*\d+)(ti|super|pro|max|plus|ultra|mini|lite|xl)$/;
+
+function variantsOf(list) {
+  const out = new Set();
+  let afterModel = false;
+  for (const t of list) {
+    const glued = t.match(VARIANT_SUFFIX);
+    if (glued) { out.add(glued[2]); afterModel = true; continue; }
+    if (VARIANT_WORDS.has(t) && afterModel) { out.add(t); continue; } // "pro max": la cadena sigue
+    afterModel = /\d/.test(t) && !UNIT_RE.test(t) && !DIM_RE.test(t);
+  }
+  return out;
+}
+
 // Un código "letras+número" (gan17, oster4) también cuenta si el título trae ambas partes por separado.
 const codeIn = (code, set, codes) => {
   if (codes.some((c) => codeEq(code, c))) return true;
@@ -90,6 +107,14 @@ export function matchProduct(srcTitle, candTitle, candPriceCop, srcPriceCop, opt
     }
   }
 
+  // 3a) Variantes del mismo modelo: 5060 vs 5060 Ti, iPhone 15 vs 15 Pro, S23 vs S23 Ultra.
+  const sVar = variantsOf(S);
+  const cVar = variantsOf(C);
+  const extraVar = [...cVar].find((v) => !sVar.has(v));
+  if (extraVar) return { ok: false, score: 0, reason: `otra variante (${extraVar})` };
+  const missingVar = [...sVar].find((v) => !cVar.has(v));
+  if (missingVar) return { ok: false, score: 0, reason: `otra variante (sin ${missingVar})` };
+
   // 3) Códigos de modelo (s23, gan17, wh1000xm5). Si el original tiene modelo, el resultado
   //    debe nombrar ese mismo modelo: ni otro (GAN V100 vs GAN 17) ni ninguno (cubo genérico).
   const sCodes = modelCodes(S);
@@ -99,7 +124,10 @@ export function matchProduct(srcTitle, candTitle, candPriceCop, srcPriceCop, opt
     return {
       ok: false,
       score: 0,
-      reason: cCodes.length ? `otro modelo (${cCodes[0]})` : `no menciona el modelo (${sCodes[0]})`,
+      // El código más largo suele ser el modelo completo (rtx3060 antes que v1).
+      reason: cCodes.length
+        ? `otro modelo (${[...cCodes].sort((a, b) => b.length - a.length)[0]})`
+        : `no menciona el modelo (${sCodes[0]})`,
     };
   }
 
@@ -196,6 +224,60 @@ export function chooseMatch(srcTitle, srcPriceCop, results, opts = {}) {
     .sort((a, b) => a.priceCop - b.priceCop)
     .filter((r) => !seen.has(r.url) && seen.add(r.url));
   return { chosen, closest: chosen, evaluated, matches };
+}
+
+/**
+ * Barra de búsqueda: separa los resultados en exactos y similares.
+ * - Con modelo, número o marca en la búsqueda ("rtx 5060 8gb"): exacto = pasa las reglas de
+ *   "mismo producto"; similar = misma categoría pero otra variante o modelo (con el motivo).
+ * - Solo descripción ("audifonos inalambricos con cancelacion de ruido"): exacto = contiene casi
+ *   todas tus palabras (o tiene la misma foto); similar = contiene parte de ellas.
+ * results: [{ title, url, priceCop, rating, reviews, store, image, imageDistance? }]
+ */
+export function classifySearch(query, results, opts = {}) {
+  const Q = tokens(query);
+  if (!Q.length) return { mode: 'descripcion', exact: [], similar: [] };
+  const qSet = new Set(Q);
+  const hasModel = modelCodes(Q).length > 0 || Q.some(isNumber) || !!sourceBrand(query);
+  const exact = [];
+  const similar = [];
+  const seen = new Set();
+
+  for (const r of results) {
+    if (!r || !r.title || !r.url || seen.has(r.url)) continue;
+    seen.add(r.url);
+    const C = tokens(r.title);
+    const cSet = new Set(C);
+    // Accesorios fuera, salvo que los estés buscando ("funda iphone 15").
+    const acc = C.find((t, i) => !qSet.has(t)
+      && (STRONG_ACCESSORY.has(t) || (ACCESSORY.has(t) && i < ACCESSORY_WINDOW)));
+    if (acc) continue;
+
+    // Qué parte de tu búsqueda aparece en el título ("5060" cuenta dentro de "5060ti").
+    const hit = (t) => cSet.has(t) || (t.length >= 3 && C.some((c) => c.startsWith(t)));
+    const coverage = Math.round((Q.filter(hit).length / Q.length) * 100) / 100;
+    const imageMatch = r.imageDistance != null && r.imageDistance <= IMAGE_MAX_DISTANCE;
+
+    let isExact;
+    let reason = null;
+    if (hasModel) {
+      const m = matchProduct(query, r.title, null, null, { ...opts, imageDistance: r.imageDistance });
+      isExact = m.ok;
+      reason = m.ok ? null : m.reason;
+    } else {
+      isExact = coverage >= 0.75 || (imageMatch && coverage >= IMAGE_MIN_SCORE);
+      if (!isExact) reason = 'parecido a tu descripción';
+    }
+
+    const item = { ...r, coverage, imageMatch, reason };
+    if (isExact) exact.push(item);
+    else if (coverage >= 0.3 || imageMatch) similar.push(item);
+  }
+
+  const byPrice = (a, b) => (a.priceCop ?? Infinity) - (b.priceCop ?? Infinity);
+  exact.sort(byPrice);
+  similar.sort((a, b) => b.coverage - a.coverage || byPrice(a, b));
+  return { mode: hasModel ? 'modelo' : 'descripcion', exact, similar };
 }
 
 export function isQualified(offer, opts = {}) {

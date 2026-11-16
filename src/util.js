@@ -160,8 +160,12 @@ const FEATURE_CODES = new Set([
 export const DIM_RE = /^\d+x\d+(x\d+)?$/;
 
 /** ¿Es un código de modelo (l80, s23, 1000xm5)? Letras y dígitos, sin ser unidad, medida ni característica. */
+// Tipos de memoria e interfaces (gddr6, ddr5, lpddr5x, pcie5): son una especificación, no el modelo.
+// También cantidades y medidas sueltas: 2x/3x (ventiladores, zoom), 0db (decibeles).
+const SPEC_CODE_RE = /^((lp)?g?ddr\d+x?|pcie\d|usb\d|hdmi\d|dp\d|bt\d|wifi\d+e?|\d+x|\d+db)$/;
+
 export const isModelCode = (w) => /[a-z]/.test(w) && /\d/.test(w)
-  && !UNIT_RE.test(w) && !DIM_RE.test(w) && !FEATURE_CODES.has(w);
+  && !UNIT_RE.test(w) && !DIM_RE.test(w) && !FEATURE_CODES.has(w) && !SPEC_CODE_RE.test(w);
 
 /**
  * Códigos de modelo de una lista de palabras, incluyendo los escritos separados:
