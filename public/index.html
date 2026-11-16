@@ -1,0 +1,595 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Price Seeker</title>
+<link rel="icon" type="image/svg+xml" href="/logo.svg">
+<style>
+  :root {
+    --bg: #f6f5f2;
+    --card: #ffffff;
+    --ink: #1b1b1b;
+    --muted: #6b6b6b;
+    --line: #e4e2dc;
+    --accent: #0f766e;
+    --accent-ink: #ffffff;
+    --good: #15803d;
+    --good-bg: #e8f6ec;
+    --warn: #92400e;
+    --warn-bg: #fdf3e1;
+    --bad: #b42318;
+    --bad-bg: #fdecea;
+    --radius: 12px;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); line-height: 1.45; }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 28px; margin: 0 0 4px; letter-spacing: -0.02em; }
+  h1.brand { display: flex; align-items: center; gap: 12px; }
+  h1.brand img { width: 40px; height: 40px; flex: none; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  form.add { display: grid; grid-template-columns: 1fr 180px 220px auto; gap: 8px; background: var(--card);
+    border: 1px solid var(--line); border-radius: var(--radius); padding: 12px; }
+  input { font: inherit; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; background: #fff; min-width: 0; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+  button { font: inherit; cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: #fff; padding: 8px 12px; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); padding: 10px 16px; font-weight: 600; }
+  button:disabled { opacity: .55; cursor: progress; }
+  .msg { min-height: 22px; margin: 8px 2px 16px; font-size: 14px; }
+  .msg.error { color: var(--bad); }
+  .empty { text-align: center; color: var(--muted); padding: 48px 0; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; }
+  .head { display: grid; grid-template-columns: 72px 1fr auto; gap: 14px; align-items: start; }
+  .head img { width: 72px; height: 72px; object-fit: contain; border-radius: 8px; background: #fafafa; border: 1px solid var(--line); }
+  .title { font-weight: 600; margin: 0 0 4px; overflow-wrap: anywhere; }
+  .title a { color: inherit; text-decoration: none; }
+  .title a:hover { text-decoration: underline; }
+  .meta { color: var(--muted); font-size: 13px; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+  .verdict { margin: 14px 0 0; padding: 12px 14px; border-radius: 10px; display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .verdict.good { background: var(--good-bg); color: var(--good); }
+  .verdict.neutral { background: #f2f1ed; color: var(--ink); }
+  .verdict .big { font-size: 22px; font-weight: 700; }
+  .banner { margin-top: 10px; padding: 8px 12px; border-radius: 8px; font-size: 14px; }
+  .banner.warn { background: var(--warn-bg); color: var(--warn); }
+  table { width: 100%; border-collapse: collapse; margin-top: 14px; font-size: 14px; }
+  th, td { text-align: left; padding: 8px 6px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td.num, th.num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  td a { color: inherit; }
+  tr.best td { background: var(--good-bg); }
+  tr:not(.group) td { border-top: none; }
+  tr.group td { border-top: 2px solid var(--line); }
+  .diff { font-size: 12px; }
+  .diff.down { color: var(--good); }
+  .diff.up { color: var(--muted); }
+  .pill { display: inline-block; padding: 1px 8px; border-radius: 99px; font-size: 12px; margin-top: 2px; }
+  .pill.good { background: var(--good-bg); color: var(--good); }
+  .pill.warn { background: var(--warn-bg); color: var(--warn); }
+  .pill.bad { background: var(--bad-bg); color: var(--bad); }
+  .pill.src { background: #eceae4; color: var(--ink); }
+  .chart { margin-top: 14px; }
+  .chart svg { width: 100%; height: 140px; display: block; }
+  .legend { font-size: 12px; color: var(--muted); display: flex; gap: 14px; margin-top: 4px; flex-wrap: wrap; }
+  .legend i { display: inline-block; width: 10px; height: 3px; vertical-align: middle; margin-right: 4px; border-radius: 2px; }
+  .edit { display: none; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+  .edit.open { display: flex; }
+  .spinner { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent;
+    border-radius: 50%; animation: spin .8s linear infinite; vertical-align: -2px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .ml { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px;
+    margin: -4px 0 20px; font-size: 14px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .ml[hidden] { display: none; }
+  .ml strong { font-weight: 600; }
+  .ml .muted { color: var(--muted); }
+  .ml a.btn { background: #ffe600; color: #2d3277; border-radius: 8px; padding: 8px 12px; font-weight: 600; text-decoration: none; }
+  .ml form { display: flex; gap: 6px; flex: 1 1 100%; }
+  .ml form input { flex: 1; }
+  .ok { color: var(--good); }
+  .bm { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 12px 14px;
+    margin: -8px 0 20px; font-size: 14px; }
+  .bm summary { cursor: pointer; }
+  .bm ol { padding-left: 20px; margin: 8px 0; }
+  .bm li { margin: 6px 0; }
+  .bm .muted { color: var(--muted); margin: 6px 0 0; }
+  .bmlink { display: inline-block; margin-left: 6px; background: var(--accent); color: #fff; padding: 4px 10px;
+    border-radius: 6px; text-decoration: none; font-weight: 600; cursor: grab; }
+  kbd { font: inherit; font-size: 12px; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 4px; padding: 0 4px; }
+  @media (prefers-reduced-motion: reduce) { .spinner { animation: none; } }
+  @media (max-width: 760px) {
+    form.add { grid-template-columns: 1fr; }
+    .head { grid-template-columns: 56px 1fr; }
+    .head img { width: 56px; height: 56px; }
+    .actions { grid-column: 1 / -1; justify-content: flex-start; }
+    .hide-sm { display: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1 class="brand"><img src="/logo.svg" alt="" width="40" height="40">Price Seeker</h1>
+  <p class="sub">Pega un link de Amazon, Mercado Libre o AliExpress (o envía uno de Temu o Shein con el botón). Busco el mismo producto más barato en las otras tiendas y, si no lo hay, te aviso cuando el tuyo baje.</p>
+
+  <form class="add" id="add">
+    <input name="url" type="url" placeholder="https://www.mercadolibre.com.co/..." required aria-label="Link del producto">
+    <input name="targetPrice" inputmode="numeric" placeholder="Precio objetivo (COP)" aria-label="Precio objetivo en COP, opcional">
+    <input name="email" type="email" placeholder="Correo para avisos" aria-label="Correo para avisos, opcional">
+    <button class="primary" type="submit">Seguir</button>
+  </form>
+  <div class="msg" id="msg" role="status"></div>
+  <section class="ml" id="ml" hidden></section>
+  <details class="bm" id="bm">
+    <summary><strong>Temu y Shein:</strong> usa el botón <em>Enviar a Price Seeker</em></summary>
+    <p>Temu y Shein bloquean la lectura automática, así que no los abro yo: los lees tú en tu navegador y me los envías.</p>
+    <ol>
+      <li>Muestra la barra de marcadores (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>B</kbd>) y <strong>arrastra este botón</strong> hasta ella:
+        <a class="bmlink" id="bmlink" href="#" title="Arrástrame a la barra de marcadores">⇪ Enviar a Price Seeker</a></li>
+      <li>Abre un producto en Temu o Shein (o en cualquier tienda) y haz clic en el marcador.</li>
+      <li>Se abre una pestaña con el nombre y el precio leídos: revísalos y pulsa <strong>Guardar y comparar</strong>.</li>
+    </ol>
+    <p class="muted">Busco el mismo producto más barato en Amazon y AliExpress, y lo vuelvo a buscar cada 6 horas.
+      El precio de Temu o Shein se actualiza cuando vuelves a pulsar el marcador en ese producto.</p>
+  </details>
+
+  <section id="list"></section>
+</main>
+
+<script>
+const $ = (s, el = document) => el.querySelector(s);
+const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cop = (n) => (n == null ? '—' : '$' + Math.round(n).toLocaleString('es-CO'));
+const safeUrl = (u) => (/^https?:\/\//i.test(u || '') ? u : '#');
+// Imágenes: además de links, el recorte de la captura (data:image/…;base64).
+const safeImg = (u) => (/^(https?:\/\/|data:image\/(jpeg|png|webp);base64,)/i.test(u || '') ? u : '');
+const ago = (iso) => {
+  if (!iso) return 'nunca';
+  const m = Math.round((Date.now() - new Date(iso)) / 60000);
+  if (m < 1) return 'hace un momento';
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.round(m / 60);
+  return h < 48 ? `hace ${h} h` : `hace ${Math.round(h / 24)} días`;
+};
+
+let products = [];
+let cfg = { dropPct: 3 };
+const openEdits = new Set();
+let timer = null;
+
+async function api(path, opts = {}) {
+  const headers = { 'Content-Type': 'application/json' };
+  const token = localStorage.getItem('pw-token');
+  if (token) headers['x-app-token'] = token;
+  const res = await fetch(path, { ...opts, headers });
+  if (res.status === 401) {
+    localStorage.removeItem('pw-token');
+    const t = prompt('Este servidor pide un token de acceso:');
+    if (t) { localStorage.setItem('pw-token', t); return api(path, opts); }
+    throw new Error('Sin acceso');
+  }
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
+}
+
+function setMsg(text, isError = false) {
+  const el = $('#msg');
+  el.textContent = text;
+  el.className = 'msg' + (isError ? ' error' : '');
+}
+
+async function load() {
+  try {
+    products = await api('/api/products');
+    render();
+  } catch (e) {
+    setMsg(e.message, true);
+  }
+  clearTimeout(timer);
+  timer = setTimeout(load, products.some((p) => p.refreshing) ? 4000 : 30000);
+}
+
+function statusPill(o) {
+  if (o.is_source) return '<span class="pill src">tu link</span>';
+  if (!o.matched) return `<span class="pill bad">no encontrado · ${esc(o.reject_reason || 'descartado')}</span>`;
+  const foto = o.image_match ? ' · misma foto' : '';
+  if (!o.qualified) return `<span class="pill warn">mismo producto${foto} · sin rating confiable</span>`;
+  return `<span class="pill good">mismo producto${foto}</span>`;
+}
+
+function chart(p) {
+  const runs = new Map();
+  for (const h of p.history) {
+    const r = runs.get(h.checked_at) || { src: null, alt: null };
+    if (h.is_source) r.src = h.price_cop;
+    else r.alt = r.alt == null ? h.price_cop : Math.min(r.alt, h.price_cop);
+    runs.set(h.checked_at, r);
+  }
+  const pts = [...runs.values()];
+  if (pts.length < 2) return '';
+  const vals = pts.flatMap((r) => [r.src, r.alt]).filter((v) => v != null);
+  const min = Math.min(...vals), max = Math.max(...vals);
+  const W = 600, H = 120, pad = 6;
+  const x = (i) => pad + (i * (W - 2 * pad)) / (pts.length - 1);
+  const y = (v) => (max === min ? H / 2 : pad + ((max - v) * (H - 2 * pad)) / (max - min));
+  const line = (key) => pts.map((r, i) => (r[key] == null ? null : `${x(i).toFixed(1)},${y(r[key]).toFixed(1)}`)).filter(Boolean).join(' ');
+  const hasAlt = pts.some((r) => r.alt != null);
+  return `
+    <div class="chart">
+      <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Historial de precios entre ${cop(min)} y ${cop(max)}">
+        <polyline points="${line('src')}" fill="none" stroke="#6b6b6b" stroke-width="2" vector-effect="non-scaling-stroke"/>
+        ${hasAlt ? `<polyline points="${line('alt')}" fill="none" stroke="var(--accent)" stroke-width="2" vector-effect="non-scaling-stroke"/>` : ''}
+      </svg>
+      <div class="legend">
+        <span><i style="background:#6b6b6b"></i>Tu link</span>
+        ${hasAlt ? '<span><i style="background:var(--accent)"></i>Mismo producto en otra tienda</span>' : ''}
+        <span>Mín ${cop(min)} · Máx ${cop(max)}</span>
+      </div>
+    </div>`;
+}
+
+function card(p) {
+  const fromSource = !p.last_metric_store || p.last_metric_store === p.store;
+  const saving = p.source_price && p.last_metric && !fromSource ? p.source_price - p.last_metric : 0;
+  const verdict = p.last_metric == null
+    ? `<div class="verdict neutral">${p.refreshing ? '<span class="spinner"></span> Buscando en las otras tiendas…' : 'Aún sin comparar'}</div>`
+    : fromSource
+      ? `<div class="verdict neutral"><span class="big">${cop(p.last_metric)}</span><span>No encontré el mismo producto más barato con buen rating. Te aviso cuando tu link baje.</span></div>`
+      : `<div class="verdict good"><span class="big">${cop(p.last_metric)}</span><span>en ${esc(p.best_store_name)}: el mismo producto, ${cop(saving)} menos que tu link.</span></div>`;
+
+  const errs = Object.entries(p.store_errors || {}).filter(([, v]) => v && v !== 'sin resultados');
+  let bestMarked = false;
+  const rows = p.offers.map((o, i) => {
+    const isBest = !fromSource && !bestMarked && !o.is_source && o.matched && o.qualified
+      && o.store === p.last_metric_store && o.price_cop === p.last_metric;
+    if (isBest) bestMarked = true;
+    const firstOfStore = i === 0 || p.offers[i - 1].store !== o.store || p.offers[i - 1].is_source !== o.is_source;
+    const diff = !o.is_source && o.matched && o.price_cop != null && p.source_price
+      ? o.price_cop - p.source_price : null;
+    const diffHtml = diff == null ? ''
+      : `<br><span class="diff ${diff < 0 ? 'down' : 'up'}">${diff < 0 ? '−' : '+'}${cop(Math.abs(diff))}</span>`;
+    return `<tr class="${isBest ? 'best' : ''} ${firstOfStore ? 'group' : ''}">
+      <td>${firstOfStore ? esc(o.store_name) : ''}</td>
+      <td>${o.matched && o.url
+        ? `<a href="${esc(safeUrl(o.url))}" target="_blank" rel="noopener noreferrer">${esc((o.title || '').slice(0, 90))}</a>`
+        : `<span class="meta">${esc((o.title || '').slice(0, 90))}</span>`}<br>${statusPill(o)}${isBest ? ' <span class="pill good">mejor opción</span>' : ''}</td>
+      <td class="num">${cop(o.price_cop)}${diffHtml}</td>
+      <td class="num hide-sm">${o.rating != null ? '★ ' + Number(o.rating).toFixed(1) : '—'}</td>
+      <td class="num hide-sm">${o.reviews != null ? Number(o.reviews).toLocaleString('es-CO') : '—'}</td>
+    </tr>`;
+  }).join('');
+
+  return `<article class="card" data-id="${p.id}">
+    <div class="head">
+      ${safeImg(p.image) ? `<img src="${esc(safeImg(p.image))}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '<img alt="">'}
+      <div>
+        <p class="title"><a href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener noreferrer">${esc(p.title || p.url)}</a></p>
+        <div class="meta">
+          ${esc(p.store_name)} · tu link: ${cop(p.source_price)}${p.manual
+            ? ` <span title="Este precio no se actualiza solo: vuelve a pulsar el marcador en la página del producto">(enviado con el botón ${ago(p.source_updated_at)})</span>`
+            : ''}
+          · ${p.target_price ? 'objetivo: ' + cop(p.target_price) : `aviso si baja ${cfg.dropPct}%`}
+          · ${p.refreshing ? '<span class="spinner"></span> revisando' : 'revisado ' + ago(p.last_checked)}
+          ${p.email ? ' · ' + esc(p.email) : ''}
+        </div>
+      </div>
+      <div class="actions">
+        <button data-act="refresh" ${p.refreshing ? 'disabled' : ''}>Revisar ahora</button>
+        <button data-act="edit">Editar</button>
+        <button data-act="delete">Dejar de seguir</button>
+      </div>
+    </div>
+    <form class="edit ${openEdits.has(p.id) ? 'open' : ''}">
+      <input name="targetPrice" inputmode="numeric" placeholder="Precio objetivo (COP)" value="${p.target_price ?? ''}" aria-label="Precio objetivo">
+      <input name="email" type="email" placeholder="Correo" value="${esc(p.email ?? '')}" aria-label="Correo">
+      <button class="primary" type="submit">Guardar</button>
+    </form>
+    ${verdict}
+    ${p.last_error ? `<div class="banner warn">No pude leer tu link en la última revisión: ${esc(p.last_error)}</div>` : ''}
+    ${errs.length ? `<div class="banner warn">Omitidas esta vez: ${errs.map(([k, v]) => `${esc(k)} (${esc(v)})`).join(' · ')}</div>` : ''}
+    ${rows ? `<table><thead><tr><th>Tienda</th><th>Producto</th><th class="num">Precio COP</th><th class="num hide-sm">Rating</th><th class="num hide-sm">Reseñas</th></tr></thead><tbody>${rows}</tbody></table>` : ''}
+    ${chart(p)}
+  </article>`;
+}
+
+function render() {
+  const list = $('#list');
+  if (!products.length) {
+    list.innerHTML = '<p class="empty">Todavía no sigues ningún producto.</p>';
+    return;
+  }
+  // No re-renderizar mientras se escribe en un formulario de edición.
+  if (list.contains(document.activeElement) && document.activeElement.tagName === 'INPUT') return;
+  list.innerHTML = products.map(card).join('');
+}
+
+$('#add').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const form = e.target;
+  const btn = form.querySelector('button');
+  const body = Object.fromEntries(new FormData(form));
+  btn.disabled = true;
+  setMsg('Leyendo el link… puede tardar unos segundos.');
+  try {
+    await api('/api/products', { method: 'POST', body: JSON.stringify(body) });
+    form.reset();
+    setMsg('Listo. Ahora busco el mismo producto en las otras tiendas.');
+    load();
+  } catch (err) {
+    setMsg(err.message, true);
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+$('#list').addEventListener('click', async (e) => {
+  const btn = e.target.closest('button[data-act]');
+  if (!btn) return;
+  const id = Number(btn.closest('.card').dataset.id);
+  const act = btn.dataset.act;
+  try {
+    if (act === 'refresh') {
+      btn.disabled = true;
+      await api(`/api/products/${id}/refresh`, { method: 'POST' });
+      load();
+    } else if (act === 'edit') {
+      if (openEdits.has(id)) openEdits.delete(id); else openEdits.add(id);
+      btn.closest('.card').querySelector('.edit').classList.toggle('open');
+    } else if (act === 'delete') {
+      if (!confirm('¿Dejar de seguir este producto? Se borra su historial.')) return;
+      await api(`/api/products/${id}`, { method: 'DELETE' });
+      load();
+    }
+  } catch (err) {
+    setMsg(err.message, true);
+  }
+});
+
+$('#list').addEventListener('submit', async (e) => {
+  if (!e.target.classList.contains('edit')) return;
+  e.preventDefault();
+  const id = Number(e.target.closest('.card').dataset.id);
+  const body = Object.fromEntries(new FormData(e.target));
+  try {
+    await api(`/api/products/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
+    openEdits.delete(id);
+    document.activeElement?.blur();
+    setMsg('Guardado. La referencia de alertas se reinició al precio actual.');
+    load();
+  } catch (err) {
+    setMsg(err.message, true);
+  }
+});
+
+// ---------- Botón "Enviar a Price Seeker" (bookmarklet) ----------
+// Esta función se ejecuta EN LA PÁGINA DE LA TIENDA que el usuario está viendo, al pulsar el marcador.
+// Lee nombre, precio e imagen y abre Price Seeker con esos datos para que el usuario los revise.
+function pwCollect(origin) {
+  if (location.origin === origin) {
+    alert('Usa este botón estando en la página del producto (Temu, Shein u otra tienda), no en Price Seeker.');
+    return;
+  }
+  const q = (s) => document.querySelector(s);
+  const meta = (p) => {
+    const el = q('meta[property="' + p + '"],meta[name="' + p + '"],meta[itemprop="' + p + '"]');
+    return el ? el.getAttribute('content') : null;
+  };
+  const find = (n) => {
+    if (!n || typeof n !== 'object') return null;
+    if (Array.isArray(n)) { for (const x of n) { const r = find(x); if (r) return r; } return null; }
+    const t = n['@type'];
+    if (t === 'Product' || (Array.isArray(t) && t.includes('Product'))) return n;
+    return find(n['@graph']);
+  };
+  let ld = null;
+  for (const s of document.querySelectorAll('script[type="application/ld+json"]')) {
+    try { ld = find(JSON.parse(s.textContent)); } catch (e) {}
+    if (ld) break;
+  }
+  let offer = ld && (Array.isArray(ld.offers) ? ld.offers[0] : ld.offers);
+  if (offer && offer.offers) offer = Array.isArray(offer.offers) ? offer.offers[0] : offer.offers;
+  let price = offer ? (offer.price != null ? offer.price : offer.lowPrice) : null;
+  let currency = offer ? offer.priceCurrency || null : null;
+  if (price == null) {
+    price = meta('product:price:amount') || meta('og:price:amount') || meta('price');
+    currency = currency || meta('product:price:currency') || meta('priceCurrency');
+  }
+  if (price == null) {
+    // Precio visible en la página: el primero que no esté tachado (el tachado es el precio "antes").
+    const els = document.querySelectorAll('[class*="price" i],[aria-label*="precio" i],[aria-label*="price" i]');
+    for (const e of els) {
+      if (!e.offsetParent) continue;
+      const cls = (typeof e.className === 'string' ? e.className : '') + ' '
+        + (e.parentElement && typeof e.parentElement.className === 'string' ? e.parentElement.className : '');
+      if (/origin|retail|del|line|before|old|was|tachad|discount|save|ahorr/i.test(cls)) continue;
+      if ((getComputedStyle(e).textDecorationLine || '').includes('line-through')) continue;
+      const t = (e.innerText || e.getAttribute('aria-label') || '').replace(/\s+/g, ' ').trim();
+      const m = t.match(/(COP|US\$|\$|€)\s?\d[\d.,]*/);
+      if (m && t.length < 80) { price = m[0]; break; }
+    }
+  }
+  const h1 = q('h1');
+  const title = (ld && ld.name) || (h1 && h1.innerText.trim()) || meta('og:title') || document.title;
+  let image = ld && ld.image;
+  if (Array.isArray(image)) image = image[0];
+  if (image && typeof image === 'object') image = image.url;
+  // Foto: la imagen visible más grande de la página es la que estás viendo en la galería del producto.
+  // Si no hay ninguna grande, la de los datos de la página.
+  {
+    let best = null, area = 0;
+    for (const im of document.images) {
+      const r = im.getBoundingClientRect();
+      const src = im.currentSrc || im.src;
+      const onScreen = r.bottom > 0 && r.right > 0 && r.top < innerHeight && r.left < innerWidth;
+      if (!onScreen || r.width < 180 || r.height < 180 || !/^https?:/.test(src)) continue;
+      if (r.width * r.height > area) { area = r.width * r.height; best = src; }
+    }
+    image = best || image || meta('og:image');
+  }
+  let desc = ((ld && ld.description) || meta('og:description') || meta('description') || '')
+    .replace(/\s+/g, ' ').trim().slice(0, 600);
+  // Descarta el eslogan de la tienda ("Smarter Shopping, Better Living! Aliexpress.com").
+  if (desc.length < 140 && /aliexpress|temu|shein|amazon|mercado ?libre/i.test(desc)) desc = '';
+  const agg = (ld && ld.aggregateRating) || {};
+  const data = {
+    url: location.href, title, price: price == null ? '' : String(price), currency, image, description: desc,
+    rating: agg.ratingValue != null ? agg.ratingValue : null,
+    reviews: agg.reviewCount != null ? agg.reviewCount : agg.ratingCount != null ? agg.ratingCount : null,
+  };
+  const send = (img) => {
+    if (img) data.image = img;
+    window.open(origin + '/importar.html#' + encodeURIComponent(JSON.stringify(data)), '_blank');
+  };
+
+  // Recorte estilo Win+Shift+S: la página se oscurece y arrastras sobre la foto del producto.
+  // No es una captura de pantalla (eso obligaría a Chrome a pedir permiso): se recorta la foto
+  // de la página que queda bajo tu selección, así que no aparece ningún diálogo.
+  snip();
+
+  function snip() {
+    const Z = 2147483647;
+    const DIM = 'rgba(0,0,0,.45)';
+    const wrap = document.createElement('div');
+    wrap.style.cssText = 'position:fixed;inset:0;z-index:' + Z + ';cursor:crosshair;background:' + DIM;
+    const sel = document.createElement('div');
+    sel.style.cssText = 'position:fixed;display:none;outline:2px solid #fff;box-shadow:0 0 0 100vmax ' + DIM
+      + ';pointer-events:none;z-index:' + Z;
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:fixed;top:12px;left:50%;transform:translateX(-50%);z-index:' + Z
+      + ';background:#1f1f1f;color:#fff;font:13px system-ui,sans-serif;padding:8px 14px;border-radius:8px;'
+      + 'box-shadow:0 4px 16px rgba(0,0,0,.4);pointer-events:none;white-space:nowrap';
+    bar.textContent = 'Price Seeker: arrastra sobre la foto del producto · Enter: usar la foto principal · Esc: cancelar';
+    document.body.append(wrap, sel, bar);
+
+    const reset = () => { sel.style.display = 'none'; wrap.style.background = DIM; };
+    const close = () => { wrap.remove(); sel.remove(); bar.remove(); removeEventListener('keydown', onKey, true); };
+    const onKey = (e) => {
+      if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); close(); }
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); close(); send(null); }
+    };
+    addEventListener('keydown', onKey, true);
+
+    let start = null;
+    wrap.addEventListener('mousedown', (e) => {
+      start = { x: e.clientX, y: e.clientY };
+      e.preventDefault();
+      e.stopPropagation();
+    });
+    wrap.addEventListener('mousemove', (e) => {
+      if (!start) return;
+      Object.assign(sel.style, {
+        display: 'block',
+        left: Math.min(e.clientX, start.x) + 'px',
+        top: Math.min(e.clientY, start.y) + 'px',
+        width: Math.abs(e.clientX - start.x) + 'px',
+        height: Math.abs(e.clientY - start.y) + 'px',
+      });
+      wrap.style.background = 'transparent'; // ahora la sombra la pone el recuadro: la selección queda iluminada
+    });
+    wrap.addEventListener('mouseup', (e) => {
+      if (!start) return;
+      const r = {
+        left: Math.min(e.clientX, start.x), top: Math.min(e.clientY, start.y),
+        right: Math.max(e.clientX, start.x), bottom: Math.max(e.clientY, start.y),
+      };
+      start = null;
+      if (r.right - r.left < 20 || r.bottom - r.top < 20) { reset(); return; } // clic sin arrastrar
+
+      // La foto de la página que más se superpone con la selección.
+      let best = null, bestArea = 0;
+      for (const im of document.images) {
+        const b = im.getBoundingClientRect();
+        const src = im.currentSrc || im.src;
+        if (!/^https?:/.test(src) || b.width < 40 || b.height < 40) continue;
+        const w = Math.min(r.right, b.right) - Math.max(r.left, b.left);
+        const h = Math.min(r.bottom, b.bottom) - Math.max(r.top, b.top);
+        if (w > 0 && h > 0 && w * h > bestArea) { bestArea = w * h; best = { src, b }; }
+      }
+      if (!best || bestArea < (r.right - r.left) * (r.bottom - r.top) * 0.3) {
+        bar.textContent = 'No hay una foto en esa zona: arrastra sobre la foto del producto · Esc: cancelar';
+        reset();
+        return;
+      }
+      // Parte de esa foto que seleccionaste, en fracciones (0 a 1) de su ancho y alto.
+      const b = best.b;
+      const fx = Math.max(0, (r.left - b.left) / b.width);
+      const fy = Math.max(0, (r.top - b.top) / b.height);
+      const fw = Math.min(1, (r.right - b.left) / b.width) - fx;
+      const fh = Math.min(1, (r.bottom - b.top) / b.height) - fy;
+      const whole = fx < 0.03 && fy < 0.03 && fw > 0.94 && fh > 0.94;
+      const f = (n) => Math.round(n * 1000) / 1000;
+      close();
+      send(whole ? best.src : best.src.split('#')[0] + '#pscrop=' + [f(fx), f(fy), f(fw), f(fh)].join(','));
+    });
+  }
+}
+
+{
+  const link = $('#bmlink');
+  link.href = 'javascript:' + encodeURIComponent('(' + pwCollect.toString() + ')(' + JSON.stringify(location.origin) + ')');
+  link.addEventListener('click', (e) => {
+    e.preventDefault();
+    setMsg('Arrastra el botón a tu barra de marcadores; se usa desde la página del producto en Temu o Shein.');
+  });
+}
+
+// ---------- Mercado Libre ----------
+async function loadMl() {
+  const box = $('#ml');
+  let s;
+  try { s = await api('/api/ml/status'); } catch { return; }
+  box.hidden = false;
+  if (!s.configured) {
+    // Sin credenciales en .env no se muestra nada: el panel aparece cuando se configure la API.
+    box.hidden = true;
+    return;
+  }
+  if (!s.connected) {
+    box.innerHTML = `
+      <span><strong>Mercado Libre:</strong> <span class="muted">falta autorizar la app (una sola vez).</span></span>
+      <a class="btn" href="/api/ml/login">Conectar Mercado Libre</a>
+      <form id="mlcode">
+        <input name="code" placeholder="¿No abrió la página de regreso? Pega aquí la URL completa a la que te mandó" aria-label="URL de regreso de Mercado Libre">
+        <button type="submit">Usar</button>
+      </form>`;
+    return;
+  }
+  box.innerHTML = `
+    <span><strong>Mercado Libre:</strong> <span class="ok">conectado por API ✓</span></span>
+    ${s.last_error ? `<span class="pill warn">${esc(s.last_error)}</span>` : ''}
+    <button id="mldisc" type="button">Desconectar</button>`;
+}
+
+$('#ml').addEventListener('submit', async (e) => {
+  if (e.target.id !== 'mlcode') return;
+  e.preventDefault();
+  try {
+    await api('/api/ml/code', { method: 'POST', body: JSON.stringify({ code: e.target.code.value }) });
+    setMsg('Mercado Libre conectado. Las próximas revisiones lo usarán.');
+    loadMl();
+  } catch (err) {
+    setMsg(err.message, true);
+  }
+});
+
+$('#ml').addEventListener('click', async (e) => {
+  if (e.target.id !== 'mldisc') return;
+  if (!confirm('¿Desconectar Mercado Libre? Se borran los tokens guardados.')) return;
+  await api('/api/ml/disconnect', { method: 'POST' }).catch((err) => setMsg(err.message, true));
+  loadMl();
+});
+
+{
+  const q = new URLSearchParams(location.search);
+  if (q.get('ml') === 'ok') setMsg('Mercado Libre conectado. Las próximas revisiones lo usarán.');
+  if (q.get('ml_error')) setMsg(q.get('ml_error'), true);
+  if (q.has('ml') || q.has('ml_error')) history.replaceState(null, '', '/');
+}
+
+loadMl();
+api('/api/config').then((c) => { cfg = c; }).catch(() => {}).finally(load);
+</script>
+</body>
+</html>
