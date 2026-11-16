@@ -18,6 +18,15 @@ Requiere Node 22.13 o superior (usa el SQLite incluido en Node, sin compilar nad
 
 `npm test` corre las pruebas de las reglas (precios, monedas, "mismo producto", alertas).
 
+## Barra de búsqueda
+
+Escribe un producto ("rtx 5060 8gb") o descríbelo ("audífonos inalámbricos con cancelación de ruido"). La app busca en Amazon y AliExpress (y Mercado Libre si la API está conectada) y muestra:
+
+- **Exactos:** el mismo modelo y variante, del más barato al más caro. Se destaca el más barato con buenas reseñas.
+- **Similares:** otras variantes y modelos cercanos, con el motivo ("otra variante (ti)", "otro modelo (rtx3060)").
+
+Distingue variantes como Ti, Pro, Max, Plus, Ultra, Super o Mini, y descarta accesorios salvo que los busques. Desde la página del botón de Temu y Shein, **Buscar sin seguir** lleva el producto (y tu foto) a la búsqueda. Cada búsqueda queda guardada 10 minutos y hay un límite de 6 por minuto por persona, porque abre Chromium en cada tienda.
+
 ## Publicar en Railway
 
 El repositorio trae `Dockerfile` y `railway.json`: Railway construye la imagen con Node 24 y Chromium.

@@ -6,12 +6,13 @@ import { config } from './src/config.js';
 import { db, now } from './src/db.js';
 import { STORES, storeFor, storeById, canonicalUrl } from './src/stores/index.js';
 import { parsePrice, parseRating, parseCount, detectCurrency, resolveCurrency, toCOP, cleanTitle } from './src/util.js';
-import { scrapeLink, refreshProduct, UserError } from './src/checker.js';
+import { scrapeLink, refreshProduct, searchProducts, UserError } from './src/checker.js';
 import { closeBrowser } from './src/browser.js';
 import * as ml from './src/mlApi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
+app.set('trust proxy', 1); // en Railway hay un proxy delante: req.ip debe ser la IP real del visitante
 app.use(express.json({ limit: '1mb' })); // la foto recortada con el botón viaja dentro del JSON
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -236,6 +237,44 @@ app.delete('/api/products/:id', wrap((req, res) => {
   const r = db.prepare('DELETE FROM products WHERE id = ?').run(Number(req.params.id));
   if (!r.changes) return res.status(404).json({ error: 'No existe' });
   res.status(204).end();
+}));
+
+// ---------- Barra de búsqueda ----------
+// Cada búsqueda abre Chromium en 2-3 tiendas: se guarda 10 minutos y se limita por IP.
+const searchCache = new Map(); // clave -> { at, data }
+const SEARCH_TTL = 10 * 60_000;
+const searchHits = new Map(); // ip -> [timestamps]
+
+function searchAllowed(ip) {
+  const now = Date.now();
+  const recent = (searchHits.get(ip) || []).filter((t) => now - t < 60_000);
+  if (recent.length >= 6) return false;
+  recent.push(now);
+  searchHits.set(ip, recent);
+  return true;
+}
+
+app.post('/api/search', wrap(async (req, res) => {
+  const q = String(req.body?.q || '').replace(/\s+/g, ' ').trim();
+  if (q.length < 2) throw new UserError('Escribe qué producto buscas');
+  if (q.length > 120) throw new UserError('La búsqueda es muy larga (máx. 120 caracteres)');
+  const rawImage = String(req.body?.image || '');
+  const image = (/^https?:\/\//i.test(rawImage) && rawImage.length <= 1500)
+    || (/^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(rawImage) && rawImage.length <= 700_000)
+    ? rawImage : null;
+
+  const key = `${q.toLowerCase()}|${image ? image.slice(-64) : ''}`;
+  const hit = searchCache.get(key);
+  if (hit && Date.now() - hit.at < SEARCH_TTL) return res.json({ ...hit.data, cached: true });
+
+  if (!searchAllowed(req.ip)) {
+    return res.status(429).json({ error: 'Demasiadas búsquedas seguidas. Espera un minuto.' });
+  }
+
+  const data = await enqueue(() => searchProducts(q, { image }));
+  searchCache.set(key, { at: Date.now(), data });
+  if (searchCache.size > 50) searchCache.delete(searchCache.keys().next().value);
+  res.json(data);
 }));
 
 app.get('/api/stores', (req, res) => {

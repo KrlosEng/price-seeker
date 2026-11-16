@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { parsePrice, parseCount, parseRating, detectCurrency, resolveCurrency, toCOP, buildQuery, cleanTitle } from '../src/util.js';
-import { matchProduct, chooseMatch, pickBest, decideAlert } from '../src/rules.js';
+import { matchProduct, chooseMatch, pickBest, decideAlert, classifySearch } from '../src/rules.js';
 
 const OPTS = { minSimilarity: 0.45, minPriceRatio: 0.4, minRating: 4, minReviews: 20, dropPct: 3, realertPct: 2 };
 
@@ -226,6 +226,51 @@ test('con marca: la misma foto confirma aunque el vendedor no ponga la marca', (
 test('la foto no cambia nada cuando hay código de modelo', () => {
   const r = matchProduct(GAN17, 'GAN V100 Maglev esmerilado cubo 3x3', 116_307, 268_889, { ...OPTS, imageDistance: 0 });
   assert.equal(r.ok, false);
+});
+
+// ---------- Variantes y barra de búsqueda ----------
+
+test('variantes: 5060 no es 5060 Ti, ni 5060Ti pegado', () => {
+  assert.match(matchProduct('rtx 5060 8gb', 'Gigabyte RTX 5060 Ti 8GB', null, null, OPTS).reason, /variante \(ti\)/);
+  assert.match(matchProduct('rtx 5060 8gb', 'Gigabyte RTX 5060Ti 8GB', null, null, OPTS).reason, /variante \(ti\)/);
+});
+
+test('variantes: iPhone 15 no es 15 Pro, y 15 Pro Max no es 15 Pro', () => {
+  assert.equal(matchProduct('Apple iPhone 15 128GB', 'Apple iPhone 15 Pro 128GB', null, null, OPTS).ok, false);
+  assert.match(matchProduct('Apple iPhone 15 Pro Max 256GB', 'Apple iPhone 15 Pro 256GB', null, null, OPTS).reason, /sin max/);
+});
+
+test('variantes: "pro" suelto no cuenta', () => {
+  assert.equal(matchProduct('Auriculares Pro Gaming inalambricos', 'Auriculares inalambricos gaming pro', null, null, OPTS).ok, true);
+});
+
+const GPU_RESULTS = [
+  { title: 'MSI GeForce RTX 5060 8GB GDDR7 Ventus 2X', url: 'a', priceCop: 1_600_000 },
+  { title: 'ASUS Dual RTX 5060 8GB OC', url: 'b', priceCop: 1_450_000 },
+  { title: 'Gigabyte RTX 5060 Ti 16GB Windforce', url: 'c', priceCop: 2_100_000 },
+  { title: 'Zotac RTX 5070 12GB', url: 'd', priceCop: 2_900_000 },
+  { title: 'Cable de extensión PCIe para RTX 5060', url: 'e', priceCop: 40_000 },
+  { title: 'Soporte vertical para tarjeta gráfica', url: 'f', priceCop: 60_000 },
+];
+
+test('búsqueda "rtx 5060 8gb": exactos baratos primero, similares con motivo, sin accesorios', () => {
+  const r = classifySearch('rtx 5060 8gb', GPU_RESULTS, OPTS);
+  assert.equal(r.mode, 'modelo');
+  assert.deepEqual(r.exact.map((x) => x.url), ['b', 'a']);
+  assert.deepEqual(r.similar.map((x) => x.url).sort(), ['c', 'd']);
+  assert.match(r.similar.find((x) => x.url === 'c').reason, /variante/);
+  assert.ok(![...r.exact, ...r.similar].some((x) => x.url === 'e' || x.url === 'f'));
+});
+
+test('búsqueda por descripción: exactos contienen casi todas las palabras', () => {
+  const r = classifySearch('audifonos inalambricos cancelacion ruido', [
+    { title: 'Audífonos inalámbricos con cancelación de ruido activa Bluetooth', url: 'x', priceCop: 200_000 },
+    { title: 'Audífonos inalámbricos deportivos', url: 'y', priceCop: 90_000 },
+    { title: 'Funda para audífonos inalámbricos', url: 'z', priceCop: 20_000 },
+  ], OPTS);
+  assert.equal(r.mode, 'descripcion');
+  assert.deepEqual(r.exact.map((x) => x.url), ['x']);
+  assert.deepEqual(r.similar.map((x) => x.url), ['y']);
 });
 
 test('limpieza de títulos de Shein y Temu', () => {

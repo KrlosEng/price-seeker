@@ -36,6 +36,8 @@
   button { font: inherit; cursor: pointer; border-radius: 8px; padding: 11px 18px; border: 1px solid var(--accent);
     background: var(--accent); color: #fff; font-weight: 600; margin-top: 16px; }
   button:disabled { opacity: .55; cursor: progress; }
+  .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  button.ghost { background: #fff; color: var(--accent); }
   .msg { min-height: 22px; margin-top: 12px; font-size: 14px; }
   .msg.error { color: var(--bad); }
   a { color: var(--accent); }
@@ -81,7 +83,10 @@
     <label for="email">Correo para avisos (opcional)</label>
     <input id="email" name="email" type="email" placeholder="Si lo dejas vacío se usa el de .env">
     <div id="warn" class="warn" hidden></div>
-    <button type="submit" id="send">Guardar y comparar</button>
+    <div class="btns">
+      <button type="submit" id="send">Guardar y comparar</button>
+      <button type="button" id="onlySearch" class="ghost">Buscar sin seguir</button>
+    </div>
     <div class="msg" id="msg" role="status"></div>
   </form>
 </main>
@@ -177,6 +182,18 @@ if (!data || !data.url) {
   $('#f').hidden = false;
   (raw ? $('#targetPrice') : $('#price')).focus();
 }
+
+// Solo buscar: lleva el nombre y la foto a la barra de búsqueda de Price Seeker, sin seguir el producto.
+$('#onlySearch').addEventListener('click', () => {
+  const q = $('#title').value.replace(/\s+/g, ' ').trim().slice(0, 120);
+  if (q.length < 2) {
+    $('#msg').className = 'msg error';
+    $('#msg').textContent = 'Escribe el nombre del producto para buscarlo.';
+    return;
+  }
+  sessionStorage.setItem('ps-search', JSON.stringify({ q, image: data.image || null }));
+  location.href = '/';
+});
 
 $('#f').addEventListener('submit', async (e) => {
   e.preventDefault();

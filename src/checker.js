@@ -4,7 +4,7 @@ import { withPage } from './browser.js';
 import { STORES, storeFor, storeById } from './stores/index.js';
 import { gotoSoft, assertNotBlocked } from './stores/common.js';
 import { parsePrice, parseRating, parseCount, detectCurrency, resolveCurrency, toCOP, buildQuery, jitter } from './util.js';
-import { chooseMatch, isQualified, pickBest, decideAlert, needsImageCheck } from './rules.js';
+import { chooseMatch, isQualified, pickBest, decideAlert, needsImageCheck, classifySearch } from './rules.js';
 import { hashImages, hamming } from './imageHash.js';
 import { sendPriceAlert } from './notify.js';
 
@@ -43,16 +43,16 @@ export async function scrapeLink(url) {
   }
 }
 
-/** Busca el mismo producto en una tienda y devuelve la mejor coincidencia (o la más cercana descartada). */
-async function searchStore(store, source) {
-  const query = buildQuery(source.title);
+/** Busca un texto en una tienda y devuelve los resultados con precio en COP, rating y reseñas. */
+async function fetchStoreResults(store, query) {
   const raw = store.api?.available()
     ? (await store.api.search(query)) || []
     : await withPage(async (page) => (await store.search(page, query)) || []);
-  const results = raw.map((r) => {
+  return raw.map((r) => {
     const price = parsePrice(r.priceText);
     const currency = resolveCurrency(price, detectCurrency(r.priceText), store.currency);
     return {
+      store: store.id,
       title: r.title,
       url: r.url,
       image: r.image || null,
@@ -61,18 +61,53 @@ async function searchStore(store, source) {
       reviews: parseCount(r.reviewsText),
     };
   });
+}
+
+/** Compara la foto de referencia con la de cada resultado y guarda la distancia (r.imageDistance). */
+async function addImageDistances(store, refImage, results) {
+  try {
+    const urls = [refImage, ...results.map((r) => r.image).filter(Boolean)];
+    const hashes = await hashImages(urls);
+    const refHash = hashes.get(refImage);
+    if (refHash) for (const r of results) r.imageDistance = hamming(refHash, hashes.get(r.image));
+  } catch (e) {
+    console.warn(`[${store.id}] no se pudieron comparar las fotos: ${e.message}`);
+  }
+}
+
+/**
+ * Barra de búsqueda: busca el texto en todas las tiendas automáticas y separa
+ * los resultados en exactos y similares (ver classifySearch en rules.js).
+ * image (opcional): link o recorte para confirmar por foto.
+ */
+export async function searchProducts(query, { image = null } = {}) {
+  const all = [];
+  const errors = {};
+  const searched = [];
+  for (const store of STORES) {
+    if (store.manualOnly || (store.searchEnabled && !store.searchEnabled())) continue;
+    searched.push(store.id);
+    try {
+      const results = await fetchStoreResults(store, query);
+      if (image) await addImageDistances(store, image, results);
+      all.push(...results);
+    } catch (e) {
+      errors[store.id] = e.message || String(e);
+      console.warn(`[búsqueda ${store.id}] falló: ${errors[store.id]}`);
+    }
+    await jitter(500, 1200);
+  }
+  const r = classifySearch(query, all.map((x) => ({ ...x, qualified: isQualified(x) })));
+  return { query, ...r, searched, errors };
+}
+
+/** Busca el mismo producto en una tienda y devuelve la mejor coincidencia (o la más cercana descartada). */
+async function searchStore(store, source) {
+  const query = buildQuery(source.title);
+  const results = await fetchStoreResults(store, query);
 
   // Sin código de modelo, la foto ayuda a confirmar que es el mismo producto (ver rules.js).
-  if (source.image && needsImageCheck(source.title)) {
-    try {
-      const urls = [source.image, ...results.map((r) => r.image).filter(Boolean)];
-      const hashes = await hashImages(urls);
-      const srcHash = hashes.get(source.image);
-      if (srcHash) for (const r of results) r.imageDistance = hamming(srcHash, hashes.get(r.image));
-    } catch (e) {
-      console.warn(`[${store.id}] no se pudieron comparar las fotos: ${e.message}`);
-    }
-  }
+  if (source.image && needsImageCheck(source.title)) await addImageDistances(store, source.image, results);
 
   const { evaluated, matches } = chooseMatch(source.title, source.priceCop, results, { srcExtra: source.description });
   if (!evaluated.length) return [];
