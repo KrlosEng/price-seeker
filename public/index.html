@@ -1,9 +1,13 @@
 <!doctype html>
+<!-- Price Seeker — © 2026 Carlos David Aguirre Angulo — https://github.com/KrlosEng/price-seeker
+     Licencia PolyForm Noncommercial 1.0.0 (ver LICENSE): uso no comercial; conserva este aviso. Huella PS-CDAA-2026-42dcad1c -->
 <html lang="es">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Price Seeker</title>
+<meta name="author" content="Carlos David Aguirre Angulo">
+<meta name="generator" content="Price Seeker · PS-CDAA-2026-42dcad1c · https://github.com/KrlosEng/price-seeker">
 <link rel="icon" type="image/svg+xml" href="/logo.svg">
 <style>
   :root {
@@ -36,6 +40,8 @@
     .layout { grid-template-columns: 260px minmax(0, 900px) 260px; grid-template-areas: "left main right"; }
     .side { margin-top: 0; position: sticky; top: 24px; align-self: start; max-height: calc(100vh - 48px); overflow: auto; }
   }
+  .credit { margin-top: 40px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; text-align: center; }
+  .credit a { color: inherit; }
   .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px; font-size: 14px; }
   .panel h3 { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
   .stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -208,6 +214,12 @@
   <section class="ml" id="ml" hidden></section>
 
   <section id="list"></section>
+
+  <footer class="credit">
+    Price Seeker © 2026 Carlos David Aguirre Angulo ·
+    <a href="https://github.com/KrlosEng/price-seeker" target="_blank" rel="noopener noreferrer">Código fuente</a> ·
+    Licencia no comercial (PolyForm Noncommercial 1.0.0)
+  </footer>
 </main>
 
 <aside class="side right" aria-label="Atajos">

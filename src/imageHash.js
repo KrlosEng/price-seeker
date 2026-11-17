@@ -1,3 +1,5 @@
+// Price Seeker — © 2026 Carlos David Aguirre Angulo — https://github.com/KrlosEng/price-seeker
+// Licencia PolyForm Noncommercial 1.0.0 (ver LICENSE): uso no comercial; conserva este aviso. Huella PS-CDAA-2026-42dcad1c
 // "Huella" de una foto de producto (dHash de 64 bits) para saber si dos tiendas usan la misma foto.
 // Los productos genéricos (sin marca) suelen venir del mismo proveedor y usar la misma foto,
 // aunque cada tienda la reescale, la comprima o le agregue bordes blancos.

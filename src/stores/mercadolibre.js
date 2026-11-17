@@ -1,3 +1,5 @@
+// Price Seeker — © 2026 Carlos David Aguirre Angulo — https://github.com/KrlosEng/price-seeker
+// Licencia PolyForm Noncommercial 1.0.0 (ver LICENSE): uso no comercial; conserva este aviso. Huella PS-CDAA-2026-42dcad1c
 import { config } from '../config.js';
 import { gotoSoft, assertNotBlocked, genericProduct } from './common.js';
 import * as ml from '../mlApi.js';

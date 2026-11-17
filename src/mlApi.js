@@ -1,3 +1,5 @@
+// Price Seeker — © 2026 Carlos David Aguirre Angulo — https://github.com/KrlosEng/price-seeker
+// Licencia PolyForm Noncommercial 1.0.0 (ver LICENSE): uso no comercial; conserva este aviso. Huella PS-CDAA-2026-42dcad1c
 // Cliente de la API oficial de Mercado Libre (OAuth 2.0, gratis).
 // Flujo: el usuario autoriza la app una vez -> guardamos access_token (6 h) y
 // refresh_token -> lo renovamos solos antes de que venza.
