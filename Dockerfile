@@ -1,3 +1,5 @@
+# Price Seeker — © 2026 Carlos David Aguirre Angulo — https://github.com/KrlosEng/price-seeker
+# Licencia PolyForm Noncommercial 1.0.0 (ver LICENSE). Huella PS-CDAA-2026-42dcad1c
 # Price Seeker para Railway (o cualquier servicio que corra contenedores).
 # Node 24 trae SQLite incluido (node:sqlite); Playwright instala Chromium y sus dependencias del sistema.
 FROM node:24-bookworm-slim
@@ -7,7 +9,8 @@ WORKDIR /app
 ENV NODE_ENV=production \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright \
     CHROMIUM_NO_SANDBOX=1 \
-    DB_PATH=/data/priceseeker.db
+    DB_PATH=/data/priceseeker.db \
+    HOST=0.0.0.0
 
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev \

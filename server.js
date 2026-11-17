@@ -1,8 +1,11 @@
+// Price Seeker — © 2026 Carlos David Aguirre Angulo — https://github.com/KrlosEng/price-seeker
+// Licencia PolyForm Noncommercial 1.0.0 (ver LICENSE): uso no comercial; conserva este aviso. Huella PS-CDAA-2026-42dcad1c
 import express from 'express';
 import cron from 'node-cron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { config } from './src/config.js';
+import { BANNER, CREDIT, FINGERPRINT, REPO, LICENSE_ID, AUTHOR } from './src/brand.js';
 import { db, now } from './src/db.js';
 import { STORES, storeFor, storeById, canonicalUrl } from './src/stores/index.js';
 import { parsePrice, parseRating, parseCount, detectCurrency, resolveCurrency, toCOP, cleanTitle } from './src/util.js';
@@ -12,7 +15,18 @@ import * as ml from './src/mlApi.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.set('trust proxy', 1); // en Railway hay un proxy delante: req.ip debe ser la IP real del visitante
+app.set('trust proxy', 1); // detrás de un proxy (Docker, un servidor), req.ip debe ser la IP real del visitante
+
+// Autoría: cada respuesta lleva el crédito y la huella del proyecto.
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  // Las cabeceras HTTP solo admiten ASCII: (c) en vez de ©.
+  res.set('X-Powered-By', `${CREDIT.replace('©', '(c)')} (${FINGERPRINT})`);
+  next();
+});
+app.get('/api/about', (req, res) => {
+  res.json({ name: 'Price Seeker', author: AUTHOR, repo: REPO, license: LICENSE_ID, fingerprint: FINGERPRINT });
+});
 app.use(express.json({ limit: '1mb' })); // la foto recortada con el botón viaja dentro del JSON
 app.use(express.static(path.join(__dirname, 'public')));
 
@@ -315,8 +329,12 @@ cron.schedule(config.checkCron, () => {
   ids.forEach((id) => enqueueRefresh(id));
 });
 
-const server = app.listen(config.port, () => {
-  console.log(`Price Seeker en http://localhost:${config.port}  (cron: ${config.checkCron})`);
+const server = app.listen(config.port, config.host, () => {
+  console.log(BANNER);
+  const where = config.host === '127.0.0.1' || config.host === 'localhost'
+    ? `http://localhost:${config.port} (solo desde este computador)`
+    : `${config.host}:${config.port} — ABIERTA a otros equipos (HOST=${config.host})`;
+  console.log(`Price Seeker en ${where}  (cron: ${config.checkCron})`);
   if (process.env.RAILWAY_ENVIRONMENT && !config.appToken) {
     console.warn('AVISO: la app está en internet sin APP_TOKEN: cualquiera con el link puede usarla. Configúralo en Variables.');
   }

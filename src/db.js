@@ -1,3 +1,5 @@
+// Price Seeker — © 2026 Carlos David Aguirre Angulo — https://github.com/KrlosEng/price-seeker
+// Licencia PolyForm Noncommercial 1.0.0 (ver LICENSE): uso no comercial; conserva este aviso. Huella PS-CDAA-2026-42dcad1c
 // SQLite incluido en Node (node:sqlite), sin compilar módulos nativos.
 import { DatabaseSync } from 'node:sqlite';
 import fs from 'node:fs';

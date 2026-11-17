@@ -4,7 +4,9 @@
   "description": "Sigue el precio de un producto, busca el mismo producto más barato en otras tiendas y avisa por correo.",
   "type": "module",
   "main": "server.js",
-  "engines": { "node": ">=22.13" },
+  "engines": {
+    "node": ">=22.13"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node --test \"tests/**/*.test.js\"",
@@ -16,5 +18,12 @@
     "node-cron": "^3.0.3",
     "nodemailer": "^6.9.15",
     "playwright": "^1.48.0"
-  }
+  },
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "author": "Carlos David Aguirre Angulo (https://github.com/KrlosEng)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/KrlosEng/price-seeker"
+  },
+  "private": true
 }

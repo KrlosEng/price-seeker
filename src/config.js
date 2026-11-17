@@ -1,3 +1,5 @@
+// Price Seeker — © 2026 Carlos David Aguirre Angulo — https://github.com/KrlosEng/price-seeker
+// Licencia PolyForm Noncommercial 1.0.0 (ver LICENSE): uso no comercial; conserva este aviso. Huella PS-CDAA-2026-42dcad1c
 import 'dotenv/config';
 
 const num = (name, def) => {
@@ -8,6 +10,9 @@ const num = (name, def) => {
 
 export const config = {
   port: num('PORT', 3000),
+  // Por seguridad, la app solo acepta conexiones de este mismo computador.
+  // Para abrirla a la red o a internet (Docker, un servidor), define HOST=0.0.0.0 a propósito.
+  host: process.env.HOST || '127.0.0.1',
   appToken: process.env.APP_TOKEN || '',
   checkCron: process.env.CHECK_CRON || '0 */6 * * *',
   usdCop: num('USD_COP', 4000),

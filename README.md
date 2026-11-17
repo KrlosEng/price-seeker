@@ -1,22 +1,33 @@
 # Price Seeker
 
-Pegas el link de un producto (Amazon, Mercado Libre, AliExpress o Temu). La app:
+Comparador de precios que corre **en tu propio computador**. Creado por **Carlos David Aguirre Angulo**.
 
-1. Busca **el mismo producto** en las otras tres tiendas y te dice si alguna lo vende más barato con buen rating.
-2. Si no lo hay, sigue el precio de tu link y **te avisa por correo cuando baja**.
+- **Busca** un producto (por modelo o descripción) en Amazon y AliExpress y te muestra los **exactos** y los **similares**.
+- **Sigue** el precio de un link y **te avisa por correo cuando baja** o cuando aparece el mismo producto más barato en otra tienda.
+- Funciona con Temu y Shein mediante un botón en tu navegador.
 
-## Arrancar
+> **Licencia no comercial.** Puedes usarlo, estudiarlo y modificarlo para uso personal, educativo o sin fines de lucro. **No puedes usarlo para ganar dinero** (venderlo, ofrecerlo como servicio, integrarlo en un negocio) sin permiso escrito del autor. Ver [Licencia y autoría](#licencia-y-autoría).
+
+## Usarla en tu computador
+
+Requisitos: **Node.js 22.13 o superior** (incluye SQLite, no hay que compilar nada) y unos 800 MB libres para Chromium.
 
 ```bash
+git clone https://github.com/KrlosEng/price-seeker.git
+cd price-seeker
 npm install
-npm run setup        # descarga Chromium para Playwright (~150 MB, una sola vez)
-cp .env.example .env # y llena SMTP_* si quieres correos
-npm start            # http://localhost:3000
+npm run setup        # descarga Chromium para Playwright, una sola vez
+cp .env.example .env # opcional: llena SMTP_* para recibir correos
+npm start            # abre http://localhost:3000
 ```
 
-Requiere Node 22.13 o superior (usa el SQLite incluido en Node, sin compilar nada).
+`npm test` corre las pruebas automáticas.
 
-`npm test` corre las pruebas de las reglas (precios, monedas, "mismo producto", alertas).
+### Seguridad
+
+- La app **solo acepta conexiones de tu propio computador** (`HOST=127.0.0.1`). Nadie de tu red Wi-Fi ni de internet puede abrirla.
+- Tus productos, precios y la configuración se guardan solo en tu equipo: en `data/` y en `.env`. Ninguno de los dos se sube a git.
+- Si de verdad quieres abrirla a otros equipos, pon `HOST=0.0.0.0` y una clave en `APP_TOKEN`, bajo tu responsabilidad.
 
 ## Barra de búsqueda
 
@@ -27,20 +38,9 @@ Escribe un producto ("rtx 5060 8gb") o descríbelo ("audífonos inalámbricos co
 
 Distingue variantes como Ti, Pro, Max, Plus, Ultra, Super o Mini, y descarta accesorios salvo que los busques. Desde la página del botón de Temu y Shein, **Buscar sin seguir** lleva el producto (y tu foto) a la búsqueda. Cada búsqueda queda guardada 10 minutos y hay un límite de 6 por minuto por persona, porque abre Chromium en cada tienda.
 
-## Publicar en Railway
+## Ejecutarla en un servidor (opcional, avanzado)
 
-El repositorio trae `Dockerfile` y `railway.json`: Railway construye la imagen con Node 24 y Chromium.
-
-1. En https://railway.com, **New Project → Deploy from GitHub repo** y elige este repositorio.
-2. En el servicio, **Settings → Volumes → Add Volume** con ruta de montaje **`/data`**. Ahí vive la base de datos; sin volumen, tus productos se borran en cada despliegue.
-3. En **Variables** agrega como mínimo:
-   - `APP_TOKEN`: una clave larga. La app la pide al abrirla; sin ella, cualquiera con el link podría usarla.
-   - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `ALERT_EMAIL_TO` si quieres correos.
-   - Opcional: `USD_COP`, `CHECK_CRON`, etc. (ver `.env.example`).
-4. **Settings → Networking → Generate Domain** para tener el link público.
-5. Abre ese link y vuelve a arrastrar el botón **Enviar a Price Seeker** desde ahí: el marcador apunta a la dirección desde la que lo arrastras.
-
-Las tiendas desconfían más de los servidores en la nube que de una conexión de casa: es posible que Amazon y AliExpress pidan captcha más seguido que en tu PC.
+El proyecto está pensado para tu computador. Si aun así quieres ponerlo en un servidor propio, el repositorio trae un `Dockerfile` (Node 24 + Chromium; usa `HOST=0.0.0.0` dentro del contenedor) y un `railway.json`. Hazlo **solo para uso personal** (lo exige la licencia), monta un volumen en `/data` para la base de datos y define `APP_TOKEN`, o cualquiera con el link podrá usar tu app. En la nube las tiendas suelen pedir captcha más seguido que en una conexión de casa.
 
 ## Temu y Shein: botón "Enviar a Price Seeker"
 
@@ -110,3 +110,17 @@ Errores típicos:
 - Para Temu y AliExpress, "reseñas" puede ser en realidad el número de vendidos.
 - Solo corre mientras el servidor esté encendido.
 - Scrapear va contra los términos de varias tiendas: úsalo para uso personal y con pocos productos.
+
+## Licencia y autoría
+
+**Price Seeker © 2026 Carlos David Aguirre Angulo** — https://github.com/KrlosEng/price-seeker
+
+Este proyecto usa la licencia **[PolyForm Noncommercial 1.0.0](LICENSE)**. En resumen (el texto que vale es el de `LICENSE`):
+
+- ✅ Puedes usarlo, copiarlo y modificarlo para **uso personal**, estudio, investigación o en organizaciones sin fines de lucro.
+- ❌ **No puedes usarlo con fines comerciales**: venderlo, cobrar por ofrecerlo como servicio, ni usarlo dentro de un negocio, sin permiso escrito del autor.
+- 📌 Cualquier copia o versión modificada **debe conservar** la línea `Required Notice` de `LICENSE` y los avisos de autoría del código.
+
+Si quieres usarlo comercialmente, contacta al autor a través de GitHub.
+
+Cada archivo lleva un aviso de autor y la huella del proyecto, que también aparece en las cabeceras del servidor y en `/api/about`. Sirve para identificar copias del proyecto.
